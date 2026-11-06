@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hotel Rojana - Billing & Invoice Generator</title>
+  
+  <!-- Tailwind CSS CDN for modern responsive UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome for crisp icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Inter and Playfair Display for classic hotel invoice header -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- html2pdf.js for generating PDF invoices -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f5fa',
+              100: '#e1ecf5',
+              200: '#c3daeb',
+              500: '#2b4c7e',
+              700: '#1e3860',
+              800: '#1a365d',
+              900: '#10223b',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            serif: ['Cinzel', 'Georgia', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Styling for Authentic Hotel Invoice and Print Engine */
+    :root {
+      --invoice-blue: #1a365d;
+      --invoice-blue-dark: #10223b;
+      --invoice-blue-light: #f0f5fa;
+      --invoice-border: #1a365d;
+      --invoice-border-soft: #cbd5e1;
+    }
+
+    body {
+      background-color: #f1f5f9;
+      color: #1e293b;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Crisp borders for invoice tables */
+    .bill-border-full {
+      border: 2px solid var(--invoice-border);
+    }
+
+    .bill-table th, 
+    .bill-table td {
+      border: 1px solid var(--invoice-border);
+    }
+
+    .bill-meta-box {
+      border: 1px solid var(--invoice-border);
+    }
+
+    /* Print Specific Styles */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 6mm 8mm;
+      }
+
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* Hide entire web UI chrome during printing */
+      .no-print,
+      #app-header,
+      #input-form-container,
+      #floating-actions,
+      #mobile-nav-tabs,
+      .toast-notification {
+        display: none !important;
+      }
+
+      /* Make Invoice Card full width, crisp, and centered on standard A4 */
+      #invoice-wrapper {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+      }
+
+      #invoice-card {
+        width: 100% !important;
+        margin: 0 auto !important;
+        box-shadow: none !important;
+        border: 2px solid #1a365d !important;
+        page-break-inside: avoid !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .print-exact {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+
+    /* Watermark for Invoice Authenticity */
+    .invoice-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-30deg);
+      opacity: 0.035;
+      pointer-events: none;
+      font-size: 6.5rem;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      color: #1a365d;
+      white-space: nowrap;
+      user-select: none;
+      z-index: 1;
+    }
+
+    /* Custom Scrollbar for Form Container */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- Top Navigation Header -->
+  <header id="app-header" class="no-print bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-lg bg-brand-800 text-white flex items-center justify-center font-serif font-bold text-xl shadow-md">
+          R
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-800 leading-tight tracking-wide flex items-center gap-2">
+            Hotel Rojana
+            <span class="text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full hidden sm:inline-flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> POS System
+            </span>
+          </h1>
+          <p class="text-xs text-slate-500">Maa Tara Enterprise &bull; New Digha, W.B.</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons Header -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <button type="button" onclick="loadSampleData()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5">
+          <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i>
+          <span class="hidden sm:inline">Fill Sample</span>
+        </button>
+
+        <button type="button" onclick="resetForm()" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5" title="Reset for new customer">
+          <i class="fa-solid fa-arrows-rotate text-slate-500"></i>
+          <span class="hidden sm:inline">New Bill</span>
+        </button>
+
+        <button type="button" onclick="saveCurrentBill()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5" title="Save bill to local storage">
+          <i class="fa-solid fa-floppy-disk text-brand-600"></i>
+          <span class="hidden sm:inline">Save</span>
+        </button>
+
+        <button type="button" onclick="openHistoryModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5 relative" title="View past saved bills">
+          <i class="fa-solid fa-clock-rotate-left text-slate-600"></i>
+          <span class="hidden sm:inline">History</span>
+          <span id="history-count-badge" class="ml-0.5 bg-brand-800 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
+        </button>
+
+        <button type="button" onclick="shareWhatsApp()" class="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm flex items-center gap-1.5">
+          <i class="fa-brands fa-whatsapp text-sm"></i>
+          <span class="hidden md:inline">WhatsApp</span>
+        </button>
+
+        <button type="button" onclick="downloadInvoicePDF()" class="px-3 py-1.5 text-xs font-medium text-white bg-brand-700 hover:bg-brand-800 rounded-lg transition-colors shadow-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-file-pdf text-sm"></i>
+          <span class="hidden md:inline">Download PDF</span>
+        </button>
+
+        <button type="button" onclick="window.print()" class="px-3.5 py-1.5 text-xs font-bold text-white bg-brand-900 hover:bg-slate-900 rounded-lg transition-colors shadow-sm flex items-center gap-1.5">
+          <i class="fa-solid fa-print text-sm"></i>
+          <span>Print</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile View Switcher (Tabs on Small Devices) -->
+  <div id="mobile-nav-tabs" class="no-print lg:hidden bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-center gap-2 sticky top-16 z-30">
+    <button type="button" id="tab-form-btn" onclick="switchMobileView('form')" class="flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-brand-800 text-white shadow-sm transition">
+      <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Details
+    </button>
+    <button type="button" id="tab-preview-btn" onclick="switchMobileView('preview')" class="flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition">
+      <i class="fa-solid fa-file-invoice mr-1"></i> Live Invoice
+    </button>
+  </div>
+
+  <!-- Main Workspace Layout -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-1">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      
+      <!-- ========================================== -->
+      <!-- LEFT COLUMN: INPUT CONTROLS & CONFIGURATION -->
+      <!-- ========================================== -->
+      <section id="input-form-container" class="lg:col-span-5 space-y-5 no-print">
+        
+        <!-- Guest Details Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-user-check text-brand-500"></i> Guest Information
+            </h2>
+            <span class="text-[11px] font-medium text-slate-400">Section 1</span>
+          </div>
+
+          <div class="space-y-3.5">
+            <div>
+              <label for="custName" class="block text-xs font-semibold text-slate-700 mb-1">
+                Customer Full Name <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 text-xs">
+                  <i class="fa-regular fa-user"></i>
+                </span>
+                <input type="text" id="custName" value="Rahul Banerjee" placeholder="e.g., Rajesh Sharma"
+                  class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  oninput="updateInvoice()">
+              </div>
+            </div>
+
+            <!-- Phone / WhatsApp Number with Country Code -->
+            <div>
+              <label for="custPhone" class="block text-xs font-semibold text-slate-700 mb-1">
+                Customer Mobile / WhatsApp <span class="text-red-500">*</span>
+              </label>
+              <div class="flex rounded-lg shadow-sm">
+                <select id="countryCode" class="px-2.5 py-2 text-xs bg-slate-100 border border-r-0 border-slate-300 rounded-l-lg text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-brand-500" onchange="updateInvoice()">
+                  <option value="+91" selected>🇮🇳 +91 (IN)</option>
+                  <option value="+880">🇧🇩 +880 (BD)</option>
+                  <option value="+977">🇳🇵 +977 (NP)</option>
+                  <option value="+1">🇺🇸 +1 (US)</option>
+                  <option value="+44">🇬🇧 +44 (UK)</option>
+                  <option value="+971">🇦🇪 +971 (UAE)</option>
+                </select>
+                <input type="tel" id="custPhone" value="9830124567" placeholder="10-digit mobile number"
+                  class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-r-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  oninput="updateInvoice()">
+              </div>
+              <p class="text-[10px] text-slate-400 mt-1">Used for 1-click WhatsApp digital bill sharing.</p>
+            </div>
+
+            <!-- ID Type & ID Number -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="idType" class="block text-xs font-semibold text-slate-700 mb-1">ID Document Type</label>
+                <select id="idType" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition" onchange="updateInvoice()">
+                  <option value="Aadhaar Card" selected>Aadhaar Card</option>
+                  <option value="Voter ID">Voter ID (EPIC)</option>
+                  <option value="Passport">Passport</option>
+                  <option value="Driving License">Driving License</option>
+                  <option value="PAN Card">PAN Card</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="idNumber" class="block text-xs font-semibold text-slate-700 mb-1">ID Number</label>
+                <input type="text" id="idNumber" value="7845 2109 3321" placeholder="e.g. 12-digit Aadhaar / Voter No"
+                  class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  oninput="updateInvoice()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Room & Stay Details Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-bed text-brand-500"></i> Stay & Room Particulars
+            </h2>
+            <span class="text-[11px] font-medium text-slate-400">Section 2</span>
+          </div>
+
+          <div class="space-y-3.5">
+            <!-- Room Type & Room Numbers -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="roomType" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Room Category <span class="text-red-500">*</span>
+                </label>
+                <select id="roomType" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition font-medium" onchange="handleRoomTypeChange()">
+                  <option value="Standard Room" data-rent="1500">Standard Room (₹ 1,500/day)</option>
+                  <option value="Deluxe Room" data-rent="2200" selected>Deluxe Room (₹ 2,200/day)</option>
+                  <option value="Super Deluxe Room" data-rent="3000">Super Deluxe Room (₹ 3,000/day)</option>
+                  <option value="Suite Room" data-rent="4500">Suite Room (₹ 4,500/day)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="roomNumber" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Room No(s) <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="roomNumber" value="204, 205" placeholder="e.g. 101 or 204, 205"
+                  class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition font-medium"
+                  oninput="updateInvoice()">
+              </div>
+            </div>
+
+            <!-- Number of Persons & Auto Days -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="numPersons" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Number of Persons <span class="text-red-500">*</span>
+                </label>
+                <input type="number" id="numPersons" value="3" min="1" max="50"
+                  class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  oninput="updateInvoice()">
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="numDays" class="text-xs font-semibold text-slate-700">
+                    Number of Days <span class="text-red-500">*</span>
+                  </label>
+                  <span id="auto-days-badge" class="text-[10px] text-brand-700 font-semibold bg-brand-50 px-1.5 py-0.2 rounded border border-brand-200">
+                    Auto-calc
+                  </span>
+                </div>
+                <input type="number" id="numDays" value="2" min="1" max="365"
+                  class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition font-semibold"
+                  oninput="manualDaysOverride()">
+              </div>
+            </div>
+
+            <!-- Check-in & Check-out Date and Time -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="checkInDateTime" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Check-in Date & Time
+                </label>
+                <input type="datetime-local" id="checkInDateTime"
+                  class="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  onchange="handleDateChange()">
+              </div>
+
+              <div>
+                <label for="checkOutDateTime" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Check-out Date & Time
+                </label>
+                <input type="datetime-local" id="checkOutDateTime"
+                  class="w-full px-2.5 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  onchange="handleDateChange()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tariff & Payment Particulars Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-calculator text-brand-500"></i> Tariff & Payment Charges
+            </h2>
+            <span class="text-[11px] font-medium text-slate-400">Section 3</span>
+          </div>
+
+          <div class="space-y-3.5">
+            <!-- Room Rent Per Day -->
+            <div>
+              <label for="roomRent" class="block text-xs font-semibold text-slate-700 mb-1">
+                Room Rent Per Day (₹) <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-xs">₹</span>
+                <input type="number" id="roomRent" value="2200" min="0" step="50"
+                  class="w-full pl-8 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                  oninput="updateInvoice()">
+              </div>
+            </div>
+
+            <!-- Extra Guest Charges & Advance Paid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="extraCharges" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Extra Guest / Other (₹)
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-xs">₹</span>
+                  <input type="number" id="extraCharges" value="500" min="0" step="50"
+                    class="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                    oninput="updateInvoice()">
+                </div>
+              </div>
+
+              <div>
+                <label for="advancePaid" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Advance Paid (₹)
+                </label>
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 font-bold text-xs">₹</span>
+                  <input type="number" id="advancePaid" value="1500" min="0" step="50"
+                    class="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition text-emerald-700 font-bold"
+                    oninput="updateInvoice()">
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Method & Invoice Serial -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="paymentMode" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Payment Mode
+                </label>
+                <select id="paymentMode" class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition" onchange="updateInvoice()">
+                  <option value="Cash" selected>Cash</option>
+                  <option value="UPI / QR (GooglePay/PhonePe)">UPI / QR (GPay/PhonePe)</option>
+                  <option value="Debit / Credit Card">Debit / Credit Card</option>
+                  <option value="Net Banking / NEFT">Net Banking / NEFT</option>
+                  <option value="Mixed (Cash + UPI)">Mixed (Cash + UPI)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="invoiceNo" class="block text-xs font-semibold text-slate-700 mb-1">
+                  Invoice / Serial No
+                </label>
+                <div class="flex">
+                  <input type="text" id="invoiceNo" value="HR-2026-0142"
+                    class="w-full px-3 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                    oninput="updateInvoice()">
+                  <button type="button" onclick="generateNewSerial()" title="Generate next serial number" class="px-2.5 bg-slate-200 hover:bg-slate-300 border border-l-0 border-slate-300 rounded-r-lg text-slate-600 text-xs transition">
+                    <i class="fa-solid fa-dice"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Remarks Note -->
+            <div>
+              <label for="billRemarks" class="block text-xs font-semibold text-slate-700 mb-1">
+                Remarks / Special Notes
+              </label>
+              <input type="text" id="billRemarks" value="Extra mattress provided in Room 204. Room checked out in clean condition." placeholder="Optional remarks on bill"
+                class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition"
+                oninput="updateInvoice()">
+            </div>
+          </div>
+        </div>
+
+        <!-- Manager Signature & Settings Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+            <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-signature text-brand-500"></i> Signature & Authorisation
+            </h2>
+            <span class="text-[11px] font-medium text-slate-400">Settings</span>
+          </div>
+
+          <div class="flex items-center justify-between text-xs">
+            <div class="space-y-0.5">
+              <p class="font-semibold text-slate-700">Digital Manager Sign & Stamp</p>
+              <p class="text-[11px] text-slate-400">Embeds authentic Maa Tara Enterprise signature.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggleManagerSign" checked class="sr-only peer" onchange="toggleSignatureVisibility()">
+              <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-700"></div>
+            </label>
+          </div>
+
+          <div class="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <input type="file" id="sigFileInput" accept="image/*" class="hidden" onchange="handleCustomSignatureUpload(event)">
+              <button type="button" onclick="document.getElementById('sigFileInput').click()" class="px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-300 font-medium text-[11px] flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-upload text-brand-600"></i> Upload Custom Sign
+              </button>
+              <button type="button" onclick="resetDefaultSignature()" class="px-2 py-1 text-slate-500 hover:text-slate-700 text-[11px] underline transition">
+                Reset Default
+              </button>
+            </div>
+            <span id="sig-status" class="text-[10px] text-emerald-600 font-medium">Default Active</span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- RIGHT COLUMN: LIVE PRINT-READY INVOICE     -->
+      <!-- ========================================== -->
+      <section id="invoice-wrapper" class="lg:col-span-7 flex flex-col items-center">
+        
+        <!-- Quick status bar above invoice preview -->
+        <div class="w-full flex items-center justify-between pb-2 mb-2 text-xs no-print px-1">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+            <span class="font-semibold text-slate-600">Live Invoice Preview (A4 Standard)</span>
+          </div>
+          <div id="payment-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300">
+            Balance Due
+          </div>
+        </div>
+
+        <!-- THE PHYSICAL RECEIPT REPLICA INVOICE CARD -->
+        <div id="invoice-card" class="bg-white w-full max-w-[780px] p-6 sm:p-8 rounded-lg shadow-md border-2 border-brand-800 text-slate-900 relative print-exact">
+          
+          <!-- Subtle Authentic Watermark -->
+          <div class="invoice-watermark no-print">HOTEL ROJANA</div>
+
+          <!-- 1. Header Section: Hotel Branding & Identification -->
+          <header class="text-center pb-3 border-b-2 border-brand-800 relative">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] font-semibold text-brand-900 mb-1 border-b border-brand-200 pb-1">
+              <div class="flex items-center gap-1.5 justify-center sm:justify-start">
+                <i class="fa-solid fa-file-invoice text-brand-700"></i>
+                <span>GSTIN: <strong class="font-mono tracking-wider" id="disp-gstin">19ABYFM7409E1Z0</strong></span>
+              </div>
+              <div class="flex items-center gap-1.5 justify-center sm:justify-end">
+                <i class="fa-solid fa-phone text-brand-700"></i>
+                <span>Mobile: <strong class="tracking-wide">9046926801</strong></span>
+              </div>
+            </div>
+
+            <div class="py-1">
+              <h1 class="text-2xl sm:text-3xl font-extrabold tracking-wider text-brand-800 font-serif uppercase leading-tight">
+                Hotel Rojana
+              </h1>
+              <p class="text-xs sm:text-sm font-semibold tracking-wide text-brand-700 italic mt-0.5">
+                Organised by Maa Tara Enterprise
+              </p>
+              <p class="text-[11px] sm:text-xs text-slate-700 mt-1 font-medium max-w-xl mx-auto leading-relaxed">
+                New Digha, Mini Holiday Home Sector, Purba Medinipur, West Bengal
+              </p>
+            </div>
+
+            <!-- Tax Invoice Banner Strip -->
+            <div class="mt-2.5 inline-block bg-brand-800 text-white text-[11px] sm:text-xs font-bold px-6 py-1 rounded tracking-widest uppercase shadow-sm print-exact">
+              Tax Invoice / Guest Bill
+            </div>
+          </header>
+
+          <!-- 2. Serial Number & Date Bar -->
+          <div class="flex flex-wrap items-center justify-between py-2 text-xs border-b border-brand-800 font-medium bg-brand-50 px-3 mt-1.5 print-exact">
+            <div class="flex items-center gap-2">
+              <span class="text-slate-600">Bill No:</span>
+              <span id="disp-invoiceNo" class="font-mono font-bold text-brand-900 tracking-wider">HR-2026-0142</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-600">Bill Date:</span>
+              <span id="disp-billDate" class="font-bold text-slate-900">06-Nov-2026</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-slate-600">Payment:</span>
+              <span id="disp-paymentMode" class="font-bold text-brand-800">Cash</span>
+            </div>
+          </div>
+
+          <!-- 3. Meta Information Grid (Customer & Stay Details) -->
+          <div class="my-3 text-xs border border-brand-800 rounded overflow-hidden">
+            <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-brand-800">
+              
+              <!-- Left Side: Guest Info -->
+              <div class="p-2.5 space-y-1.5 bg-white">
+                <div class="flex">
+                  <span class="w-32 font-bold text-slate-700">Guest Name:</span>
+                  <span id="disp-custName" class="font-bold text-brand-900 uppercase">Rahul Banerjee</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-medium text-slate-600">Phone / WhatsApp:</span>
+                  <span id="disp-custPhone" class="font-mono font-semibold text-slate-800">+91 9830124567</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-medium text-slate-600">ID Proof:</span>
+                  <span id="disp-idProof" class="text-slate-800">Aadhaar (7845 2109 3321)</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-medium text-slate-600">No. of Persons:</span>
+                  <span id="disp-persons" class="font-semibold text-slate-800">3 Persons</span>
+                </div>
+              </div>
+
+              <!-- Right Side: Room & Stay Info -->
+              <div class="p-2.5 space-y-1.5 bg-white">
+                <div class="flex">
+                  <span class="w-32 font-bold text-slate-700">Room Category:</span>
+                  <span id="disp-roomType" class="font-bold text-brand-900">Deluxe Room</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-bold text-slate-700">Room Number(s):</span>
+                  <span id="disp-roomNumber" class="font-mono font-bold text-brand-900">204, 205</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-medium text-slate-600">Check-in:</span>
+                  <span id="disp-checkIn" class="font-medium text-slate-800">06-Nov-2026, 12:00 PM</span>
+                </div>
+                <div class="flex">
+                  <span class="w-32 font-medium text-slate-600">Check-out:</span>
+                  <span id="disp-checkOut" class="font-medium text-slate-800">08-Nov-2026, 11:00 AM</span>
+                </div>
+                <div class="flex bg-brand-50 -mx-2.5 -mb-2.5 p-1.5 px-2.5 border-t border-brand-200">
+                  <span class="w-32 font-bold text-brand-900">Total Duration:</span>
+                  <span id="disp-duration" class="font-bold text-brand-900">2 Days / Nights @ ₹ 2,200/day</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 4. Itemized Calculation Table -->
+          <div class="my-3 overflow-hidden border border-brand-800 rounded">
+            <table class="w-full text-xs text-left bill-table border-collapse">
+              <thead>
+                <tr class="bg-brand-800 text-white font-bold text-center print-exact">
+                  <th class="py-2 px-2 w-12 border-brand-800">SL</th>
+                  <th class="py-2 px-3 text-left border-brand-800">DESCRIPTION OF CHARGES</th>
+                  <th class="py-2 px-2 w-24 text-right border-brand-800">RATE (₹)</th>
+                  <th class="py-2 px-2 w-16 text-center border-brand-800">QTY</th>
+                  <th class="py-2 px-3 w-28 text-right border-brand-800">AMOUNT (₹)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-brand-800 text-slate-800 font-medium">
+                <!-- 1. Accommodation Charges -->
+                <tr>
+                  <td class="py-2 px-2 text-center font-mono">1</td>
+                  <td class="py-2 px-3">
+                    <div class="font-bold text-slate-900">Room Accommodation Charges</div>
+                    <div class="text-[10px] text-slate-500 font-normal">
+                      <span id="table-room-desc">Deluxe Room (Room 204, 205)</span> &bull; 
+                      <span id="table-days-desc">2 Days</span>
+                    </div>
+                  </td>
+                  <td class="py-2 px-2 text-right font-mono" id="table-room-rate">2,200.00</td>
+                  <td class="py-2 px-2 text-center font-mono" id="table-room-days">2</td>
+                  <td class="py-2 px-3 text-right font-mono font-bold" id="table-room-total">4,400.00</td>
+                </tr>
+
+                <!-- 2. Extra Guest / Other Charges (Conditional or row) -->
+                <tr id="row-extra-charges">
+                  <td class="py-2 px-2 text-center font-mono">2</td>
+                  <td class="py-2 px-3">
+                    <div class="font-semibold text-slate-900">Extra Guest / Miscellaneous Charges</div>
+                    <div class="text-[10px] text-slate-500 font-normal">Extra mattress & guest amenities</div>
+                  </td>
+                  <td class="py-2 px-2 text-right font-mono" id="table-extra-rate">500.00</td>
+                  <td class="py-2 px-2 text-center font-mono">1</td>
+                  <td class="py-2 px-3 text-right font-mono font-semibold" id="table-extra-total">500.00</td>
+                </tr>
+
+                <!-- Subtotal Row -->
+                <tr class="bg-slate-50 font-semibold border-t-2 border-brand-800">
+                  <td colspan="4" class="py-1.5 px-3 text-right uppercase tracking-wider text-[11px] text-slate-700">
+                    Subtotal (Taxable Amount):
+                  </td>
+                  <td class="py-1.5 px-3 text-right font-mono font-bold text-slate-900" id="disp-subtotal">
+                    4,900.00
+                  </td>
+                </tr>
+
+                <!-- CGST 2.5% -->
+                <tr>
+                  <td colspan="4" class="py-1 px-3 text-right text-slate-600">
+                    CGST (2.5%):
+                  </td>
+                  <td class="py-1 px-3 text-right font-mono font-medium text-slate-800" id="disp-cgst">
+                    122.50
+                  </td>
+                </tr>
+
+                <!-- SGST 2.5% -->
+                <tr>
+                  <td colspan="4" class="py-1 px-3 text-right text-slate-600">
+                    SGST (2.5%):
+                  </td>
+                  <td class="py-1 px-3 text-right font-mono font-medium text-slate-800" id="disp-sgst">
+                    122.50
+                  </td>
+                </tr>
+
+                <!-- Total GST 5% -->
+                <tr class="bg-slate-50/70 text-[11px]">
+                  <td colspan="4" class="py-1 px-3 text-right text-slate-500 italic">
+                    Total GST (5.0%):
+                  </td>
+                  <td class="py-1 px-3 text-right font-mono text-slate-600" id="disp-total-gst">
+                    245.00
+                  </td>
+                </tr>
+
+                <!-- Net Total Amount -->
+                <tr class="bg-slate-100 font-bold border-t border-brand-800">
+                  <td colspan="4" class="py-1.5 px-3 text-right uppercase tracking-wider text-slate-900">
+                    Net Total Bill Amount:
+                  </td>
+                  <td class="py-1.5 px-3 text-right font-mono text-brand-900 font-extrabold text-xs sm:text-sm" id="disp-netTotal">
+                    5,145.00
+                  </td>
+                </tr>
+
+                <!-- Less Advance Paid -->
+                <tr class="text-emerald-800">
+                  <td colspan="4" class="py-1.5 px-3 text-right font-medium">
+                    Less: Advance Paid Received:
+                  </td>
+                  <td class="py-1.5 px-3 text-right font-mono font-bold" id="disp-advancePaid">
+                    - 1,500.00
+                  </td>
+                </tr>
+
+                <!-- FINAL TOTAL RECEIPT / BALANCE PAYABLE HIGHLIGHTED ROW -->
+                <tr class="bg-brand-800 text-white font-extrabold text-sm border-t-2 border-brand-800 print-exact">
+                  <td colspan="4" class="py-2.5 px-3 text-right uppercase tracking-wider">
+                    <span id="label-balance-due">Total Receipt / Balance Payable:</span>
+                  </td>
+                  <td class="py-2.5 px-3 text-right font-mono text-sm sm:text-base tracking-tight" id="disp-balanceDue">
+                    ₹ 3,645.00
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 5. Amount in Words Box -->
+          <div class="my-2.5 p-2 bg-brand-50 border border-brand-800 rounded text-xs print-exact">
+            <span class="font-bold text-brand-900">Amount in Words:</span>
+            <span id="disp-amountWords" class="italic font-semibold text-slate-800 ml-1">
+              Three Thousand Six Hundred Forty Five Rupees Only
+            </span>
+          </div>
+
+          <!-- 6. Remarks and Instructions Line -->
+          <div id="disp-remarks-container" class="my-2 px-1 text-[11px] text-slate-600">
+            <span class="font-bold text-slate-700">Remarks:</span>
+            <span id="disp-remarks-text" class="italic ml-1">Extra mattress provided in Room 204. Room checked out in clean condition.</span>
+          </div>
+
+          <!-- 7. Standard Terms & Conditions -->
+          <div class="my-2 border-t border-dashed border-slate-300 pt-2 text-[9.5px] text-slate-500 leading-normal">
+            <div class="font-bold text-slate-700 mb-0.5 uppercase tracking-wider text-[10px]">Terms & Conditions:</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+              <p>&bull; Standard Check-in: 12:00 PM | Check-out: 11:00 AM.</p>
+              <p>&bull; Please deposit room key at reception during final check-out.</p>
+              <p>&bull; Management is not responsible for personal valuables or cash.</p>
+              <p>&bull; All legal disputes subject to Digha / Purba Medinipur jurisdiction.</p>
+            </div>
+          </div>
+
+          <!-- 8. Signatures Area (Customer Sign on Left & Manager Sign on Right) -->
+          <div class="mt-6 pt-2 border-t border-brand-800 flex items-end justify-between text-xs">
+            
+            <!-- Left: Customer Signature -->
+            <div class="text-center w-44">
+              <div class="h-14 flex items-end justify-center pb-1">
+                <span class="text-slate-300 text-[10px] italic">Verified & Accepted</span>
+              </div>
+              <div class="border-t border-slate-700 pt-1 font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Customer's Sign
+              </div>
+            </div>
+
+            <!-- Right: Manager / Stamp Signature Area -->
+            <div class="text-center w-52 relative">
+              <div id="manager-sign-wrapper" class="h-16 flex items-center justify-center relative">
+                <!-- Authentic stamp and manager signature image -->
+                <img id="manager-sig-img" 
+                     src="manager-sign.png" 
+                     alt="Manager Signature & Stamp" 
+                     class="max-h-16 object-contain pointer-events-none"
+                     onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'240\' height=\'80\' viewBox=\'0 0 240 80\'><g fill=\'none\' stroke=\'%231a365d\'><circle cx=\'50\' cy=\'40\' r=\'32\' stroke-width=\'2\' stroke-dasharray=\'4 2\'/><circle cx=\'50\' cy=\'40\' r=\'27\' stroke-width=\'1\'/><text x=\'50\' y=\'36\' font-size=\'7\' font-weight=\'bold\' fill=\'%231a365d\' text-anchor=\'middle\' stroke=\'none\'>HOTEL ROJANA</text><text x=\'50\' y=\'46\' font-size=\'6\' fill=\'%231a365d\' text-anchor=\'middle\' stroke=\'none\'>★ DIGHA ★</text><path d=\'M95 50 Q110 20 125 45 T155 35 T180 55 T215 30\' stroke-width=\'2.5\' stroke-linecap=\'round\'/><path d=\'M90 60 Q150 55 220 52\' stroke-width=\'1.8\' stroke-linecap=\'round\'/></g></svg>';" />
+              </div>
+              <div class="border-t border-slate-700 pt-1 font-bold text-brand-900 uppercase tracking-wider text-[11px]">
+                Manager
+              </div>
+              <div class="text-[9.5px] text-slate-600 font-semibold tracking-tight">
+                For Hotel Rojana / Maa Tara Ent.
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Micro Details -->
+          <div class="mt-4 pt-1.5 border-t border-slate-200 text-center text-[9px] text-slate-400 font-mono">
+            Generated via Hotel Rojana Billing Engine &bull; GSTIN: 19ABYFM7409E1Z0 &bull; Computer Generated Tax Invoice
+          </div>
+
+        </div>
+
+        <!-- Print Advice / Helper Note for Users -->
+        <div class="w-full max-w-[780px] mt-4 p-3 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-900 flex items-center justify-between no-print shadow-sm">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-circle-info text-brand-700 text-sm"></i>
+            <span>Tip: For optimal printing, ensure standard <strong>A4 Portrait</strong> is selected in print settings.</span>
+          </div>
+          <button type="button" onclick="window.print()" class="text-xs font-bold text-brand-700 hover:text-brand-900 underline flex items-center gap-1">
+            <i class="fa-solid fa-print"></i> Print Now
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Sticky Bottom Quick Actions Bar for Tablets and Mobile -->
+  <div id="floating-actions" class="no-print lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 p-3 shadow-lg z-30 flex items-center justify-around gap-2">
+    <button type="button" onclick="shareWhatsApp()" class="flex-1 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-sm">
+      <i class="fa-brands fa-whatsapp"></i> WhatsApp
+    </button>
+    <button type="button" onclick="downloadInvoicePDF()" class="flex-1 py-2 text-xs font-bold bg-brand-700 hover:bg-brand-800 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-sm">
+      <i class="fa-solid fa-file-pdf"></i> PDF
+    </button>
+    <button type="button" onclick="window.print()" class="flex-1 py-2 text-xs font-bold bg-brand-900 hover:bg-slate-900 text-white rounded-lg flex items-center justify-center gap-1.5 shadow-sm">
+      <i class="fa-solid fa-print"></i> Print
+    </button>
+  </div>
+
+  <!-- Toast Notification element -->
+  <div id="toast" class="no-print fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-xl text-xs font-medium flex items-center gap-2">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toast-message">Invoice updated</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="no-print border-t border-slate-200 bg-white py-3 mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-slate-500">
+      Hotel Rojana &copy; 2026 &bull; Organised by Maa Tara Enterprise &bull; New Digha, West Bengal &bull; Contact: 9046926801
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- VANILLA JAVASCRIPT LOGIC & DYNAMIC INVOICE CALCULATOR    -->
+  <!-- ======================================================== -->
+  <script>
+    /**
+     * Application State & Flags
+     */
+    let autoCalcDays = true;
+
+    /**
+     * Formats a given number into Indian Rupee currency format (e.g. 2,500.00)
+     * @param {number} amount
+     * @returns {string}
+     */
+    function formatINR(amount) {
+      if (isNaN(amount) || amount === null) return '0.00';
+      return Number(amount).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    /**
+     * Converts a number into Indian English words (Lakhs, Thousands, Rupees, Paise)
+     * Meets prompt requirement: e.g. "One Thousand Fifty Rupees Only"
+     * @param {number} num
+     * @returns {string}
+     */
+    function numberToWordsINR(num) {
+      if (isNaN(num) || num === null) return 'Zero Rupees Only';
+      let n = Math.round(num * 100) / 100;
+      if (n === 0) return 'Zero Rupees Only';
+
+      const isNegative = n < 0;
+      n = Math.abs(n);
+
+      let rupees = Math.floor(n);
+      const paise = Math.round((n - rupees) * 100);
+
+      const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+                    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+                    'Seventeen', 'Eighteen', 'Nineteen'];
+      const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+      function convertTwoDigits(val) {
+        if (val < 20) return ones[val];
+        return tens[Math.floor(val / 10)] + (val % 10 > 0 ? ' ' + ones[val % 10] : '');
+      }
+
+      function convertThreeDigits(val) {
+        let str = '';
+        if (Math.floor(val / 100) > 0) {
+          str += ones[Math.floor(val / 100)] + ' Hundred';
+          if (val % 100 > 0) str += ' ';
+        }
+        if (val % 100 > 0) {
+          str += convertTwoDigits(val % 100);
+        }
+        return str;
+      }
+
+      let words = '';
+
+      // Crores (1,00,00,000)
+      const crores = Math.floor(rupees / 10000000);
+      rupees %= 10000000;
+      if (crores > 0) {
+        words += convertThreeDigits(crores) + ' Crore ';
+      }
+
+      // Lakhs (1,00,000)
+      const lakhs = Math.floor(rupees / 100000);
+      rupees %= 100000;
+      if (lakhs > 0) {
+        words += convertTwoDigits(lakhs) + ' Lakh ';
+      }
+
+      // Thousands (1,000)
+      const thousands = Math.floor(rupees / 1000);
+      rupees %= 1000;
+      if (thousands > 0) {
+        words += convertTwoDigits(thousands) + ' Thousand ';
+      }
+
+      // Hundreds & below
+      if (rupees > 0) {
+        words += convertThreeDigits(rupees);
+      }
+
+      words = words.trim();
+      if (!words) words = 'Zero';
+      words += ' Rupees';
+
+      if (paise > 0) {
+        words += ' and ' + convertTwoDigits(paise) + ' Paise';
+      }
+
+      words += ' Only';
+      if (isNegative) words = 'Minus ' + words;
+      return words;
+    }
+
+    /**
+     * Formats ISO datetime string to legible display: "06-Nov-2026, 12:00 PM"
+     * @param {string} dtStr
+     * @returns {string}
+     */
+    function formatDisplayDateTime(dtStr) {
+      if (!dtStr) return 'Not Specified';
+      const d = new Date(dtStr);
+      if (isNaN(d.getTime())) return dtStr;
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = months[d.getMonth()];
+      const year = d.getFullYear();
+
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // 0 hour should be 12
+
+      return `${day}-${month}-${year}, ${hours}:${minutes} ${ampm}`;
+    }
+
+    /**
+     * Formats current date for Bill Date: "06-Nov-2026"
+     */
+    function getCurrentFormattedDate() {
+      const d = new Date();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${String(d.getDate()).padStart(2, '0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+    }
+
+    /**
+     * Initializes default dates (Check-in: Today 12:00 PM, Check-out: +2 days 11:00 AM)
+     */
+    function initializeDefaultDates() {
+      const now = new Date();
+      
+      // Check-in: Today at 12:00
+      const checkIn = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0);
+      
+      // Check-out: 2 days later at 11:00 AM
+      const checkOut = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 11, 0);
+
+      const formatForInput = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      };
+
+      document.getElementById('checkInDateTime').value = formatForInput(checkIn);
+      document.getElementById('checkOutDateTime').value = formatForInput(checkOut);
+      document.getElementById('disp-billDate').textContent = getCurrentFormattedDate();
+      
+      calculateDaysBetweenDates();
+    }
+
+    /**
+     * Dynamic Calculation of Stay Days
+     * Minimum 1 day as requested in prompt.
+     */
+    function calculateDaysBetweenDates() {
+      const cinStr = document.getElementById('checkInDateTime').value;
+      const coutStr = document.getElementById('checkOutDateTime').value;
+
+      if (!cinStr || !coutStr) return;
+
+      const d1 = new Date(cinStr);
+      const d2 = new Date(coutStr);
+
+      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return;
+
+      const diffMs = d2.getTime() - d1.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      // Hotel day calculation: difference in hours divided by 24, minimum 1
+      let calculatedDays = Math.max(1, Math.round(diffHours / 24));
+
+      if (autoCalcDays) {
+        document.getElementById('numDays').value = calculatedDays;
+        document.getElementById('auto-days-badge').textContent = 'Auto-calc';
+        document.getElementById('auto-days-badge').className = 'text-[10px] text-brand-700 font-semibold bg-brand-50 px-1.5 py-0.2 rounded border border-brand-200';
+      }
+    }
+
+    /**
+     * Called when Check-in or Check-out date pickers change
+     */
+    function handleDateChange() {
+      autoCalcDays = true;
+      calculateDaysBetweenDates();
+      updateInvoice();
+    }
+
+    /**
+     * Called if user manually overrides the Number of Days input
+     */
+    function manualDaysOverride() {
+      autoCalcDays = false;
+      document.getElementById('auto-days-badge').textContent = 'Manual';
+      document.getElementById('auto-days-badge').className = 'text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200';
+      updateInvoice();
+    }
+
+    /**
+     * Updates default rent per day when room type dropdown changes
+     */
+    function handleRoomTypeChange() {
+      const roomSelect = document.getElementById('roomType');
+      const selectedOption = roomSelect.options[roomSelect.selectedIndex];
+      const defaultRent = selectedOption.getAttribute('data-rent');
+      
+      if (defaultRent) {
+        document.getElementById('roomRent').value = defaultRent;
+      }
+      updateInvoice();
+    }
+
+    /**
+     * Generates a new invoice number (e.g., HR-2026-0843)
+     */
+    function generateNewSerial() {
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      const year = new Date().getFullYear();
+      const newSerial = `HR-${year}-${randomNum}`;
+      document.getElementById('invoiceNo').value = newSerial;
+      updateInvoice();
+      showToast(`Generated new serial: ${newSerial}`);
+    }
+
+    /**
+     * Toggle visibility of manager signature
+     */
+    function toggleSignatureVisibility() {
+      const checkbox = document.getElementById('toggleManagerSign');
+      const wrapper = document.getElementById('manager-sign-wrapper');
+      if (checkbox.checked) {
+        wrapper.style.visibility = 'visible';
+      } else {
+        wrapper.style.visibility = 'hidden';
+      }
+    }
+
+    /**
+     * Handles upload of custom manager signature or stamp
+     */
+    function handleCustomSignatureUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('manager-sig-img').src = e.target.result;
+        const statusEl = document.getElementById('sig-status');
+        if (statusEl) {
+          statusEl.textContent = 'Custom Loaded';
+          statusEl.className = 'text-[10px] text-blue-600 font-medium';
+        }
+        showToast('Custom manager signature uploaded!');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    /**
+     * Restores default manager signature and stamp
+     */
+    function resetDefaultSignature() {
+      document.getElementById('manager-sig-img').src = 'manager-sign.png';
+      const statusEl = document.getElementById('sig-status');
+      if (statusEl) {
+        statusEl.textContent = 'Default Active';
+        statusEl.className = 'text-[10px] text-emerald-600 font-medium';
+      }
+      showToast('Reset to default Maa Tara Enterprise seal');
+    }
+
+    /**
+     * CORE CALCULATION & LIVE DOM UPDATE ENGINE
+     * Performs exact arithmetic as per requirements:
+     * - Base Accommodation Charges = Room Rent Per Day * Number of Days
+     * - Subtotal = Base Accommodation Charges + Extra Guest Charges
+     * - CGST = 2.5% of Subtotal
+     * - SGST = 2.5% of Subtotal
+     * - Total GST = 5% of Subtotal
+     * - Net Total = Subtotal + Total GST
+     * - Balance Due = Net Total - Advance Paid
+     * - Words = Indian English words of final amount
+     */
+    function updateInvoice() {
+      // 1. Read Inputs
+      const custName = document.getElementById('custName').value.trim() || 'Guest';
+      const countryCode = document.getElementById('countryCode').value;
+      const custPhone = document.getElementById('custPhone').value.trim() || 'N/A';
+      const idType = document.getElementById('idType').value;
+      const idNumber = document.getElementById('idNumber').value.trim() || 'N/A';
+
+      const roomType = document.getElementById('roomType').value;
+      const roomNumber = document.getElementById('roomNumber').value.trim() || 'N/A';
+      const numPersons = Math.max(1, parseInt(document.getElementById('numPersons').value) || 1);
+      const numDays = Math.max(1, parseInt(document.getElementById('numDays').value) || 1);
+
+      const cinStr = document.getElementById('checkInDateTime').value;
+      const coutStr = document.getElementById('checkOutDateTime').value;
+
+      const roomRent = Math.max(0, parseFloat(document.getElementById('roomRent').value) || 0);
+      const extraCharges = Math.max(0, parseFloat(document.getElementById('extraCharges').value) || 0);
+      const advancePaid = Math.max(0, parseFloat(document.getElementById('advancePaid').value) || 0);
+      const paymentMode = document.getElementById('paymentMode').value;
+      const invoiceNo = document.getElementById('invoiceNo').value.trim() || 'HR-2026-0001';
+      const remarks = document.getElementById('billRemarks').value.trim();
+
+      // 2. Perform Dynamic Calculations
+      const baseAccommodation = roomRent * numDays;
+      const subtotal = baseAccommodation + extraCharges;
+
+      const cgst = Math.round((subtotal * 0.025) * 100) / 100;
+      const sgst = Math.round((subtotal * 0.025) * 100) / 100;
+      const totalGst = cgst + sgst;
+
+      const netTotal = Math.round((subtotal + totalGst) * 100) / 100;
+      const balanceDue = Math.round((netTotal - advancePaid) * 100) / 100;
+
+      // 3. Update Meta Grid Displays
+      document.getElementById('disp-invoiceNo').textContent = invoiceNo;
+      document.getElementById('disp-paymentMode').textContent = paymentMode;
+      document.getElementById('disp-custName').textContent = custName;
+      document.getElementById('disp-custPhone').textContent = `${countryCode} ${custPhone}`;
+      document.getElementById('disp-idProof').textContent = `${idType} (${idNumber})`;
+      document.getElementById('disp-persons').textContent = `${numPersons} Person${numPersons > 1 ? 's' : ''}`;
+      
+      document.getElementById('disp-roomType').textContent = roomType;
+      document.getElementById('disp-roomNumber').textContent = roomNumber;
+      document.getElementById('disp-checkIn').textContent = formatDisplayDateTime(cinStr);
+      document.getElementById('disp-checkOut').textContent = formatDisplayDateTime(coutStr);
+      document.getElementById('disp-duration').textContent = `${numDays} Day${numDays > 1 ? 's' : ''} / Night${numDays > 1 ? 's' : ''} @ ₹ ${formatINR(roomRent)}/day`;
+
+      // 4. Update Table Rows
+      document.getElementById('table-room-desc').textContent = `${roomType} (Room ${roomNumber})`;
+      document.getElementById('table-days-desc').textContent = `${numDays} Day${numDays > 1 ? 's' : ''}`;
+      document.getElementById('table-room-rate').textContent = formatINR(roomRent);
+      document.getElementById('table-room-days').textContent = numDays;
+      document.getElementById('table-room-total').textContent = formatINR(baseAccommodation);
+
+      // Handle Extra Charges Row Visibility
+      const extraRow = document.getElementById('row-extra-charges');
+      if (extraCharges > 0) {
+        extraRow.style.display = 'table-row';
+        document.getElementById('table-extra-rate').textContent = formatINR(extraCharges);
+        document.getElementById('table-extra-total').textContent = formatINR(extraCharges);
+      } else {
+        extraRow.style.display = 'none';
+      }
+
+      // 5. Update Tax & Summary Displays
+      document.getElementById('disp-subtotal').textContent = formatINR(subtotal);
+      document.getElementById('disp-cgst').textContent = formatINR(cgst);
+      document.getElementById('disp-sgst').textContent = formatINR(sgst);
+      document.getElementById('disp-total-gst').textContent = formatINR(totalGst);
+      document.getElementById('disp-netTotal').textContent = formatINR(netTotal);
+      document.getElementById('disp-advancePaid').textContent = `- ${formatINR(advancePaid)}`;
+
+      // Final Balance / Total Receipt
+      const balanceEl = document.getElementById('disp-balanceDue');
+      const labelBalanceEl = document.getElementById('label-balance-due');
+      const badgeEl = document.getElementById('payment-badge');
+
+      if (balanceDue <= 0) {
+        if (balanceDue === 0) {
+          labelBalanceEl.textContent = 'Net Amount Paid in Full:';
+          balanceEl.textContent = `₹ ${formatINR(netTotal)}`;
+          badgeEl.textContent = 'PAID IN FULL';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300';
+        } else {
+          // Negative balance (refund due to excess advance)
+          labelBalanceEl.textContent = 'Refund Due to Guest:';
+          balanceEl.textContent = `₹ ${formatINR(Math.abs(balanceDue))}`;
+          badgeEl.textContent = 'REFUND DUE';
+          badgeEl.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-100 text-purple-800 border border-purple-300';
+        }
+      } else {
+        labelBalanceEl.textContent = 'Total Receipt / Balance Payable:';
+        balanceEl.textContent = `₹ ${formatINR(balanceDue)}`;
+        badgeEl.textContent = `DUE: ₹ ${formatINR(balanceDue)}`;
+        badgeEl.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300';
+      }
+
+      // 6. Convert Final Amount to Words
+      // When balance due > 0, we express the balance payable in words; otherwise net total
+      const amountForWords = balanceDue > 0 ? balanceDue : netTotal;
+      document.getElementById('disp-amountWords').textContent = numberToWordsINR(amountForWords);
+
+      // 7. Update Remarks Container
+      const remarksContainer = document.getElementById('disp-remarks-container');
+      if (remarks) {
+        remarksContainer.style.display = 'block';
+        document.getElementById('disp-remarks-text').textContent = remarks;
+      } else {
+        remarksContainer.style.display = 'none';
+      }
+    }
+
+    /**
+     * Share on WhatsApp:
+     * Extracts guest phone, formats summary, triggers https://wa.me/<PhoneNumber>?text=<EncodedMessage>
+     */
+    function shareWhatsApp() {
+      const custPhone = document.getElementById('custPhone').value.trim();
+      const countryCode = document.getElementById('countryCode').value.replace('+', '');
+      
+      // Clean phone number (remove dashes, spaces, brackets)
+      let cleanPhone = custPhone.replace(/\D/g, '');
+      
+      if (!cleanPhone) {
+        alert('Please enter a valid Customer Mobile / WhatsApp number to share.');
+        document.getElementById('custPhone').focus();
+        return;
+      }
+
+      // If user did not include country code in input, prepend selected country code
+      let fullPhoneNumber = cleanPhone;
+      if (!cleanPhone.startsWith(countryCode) && cleanPhone.length <= 10) {
+        fullPhoneNumber = countryCode + cleanPhone;
+      }
+
+      // Extract details for executive message
+      const invoiceNo = document.getElementById('invoiceNo').value;
+      const guestName = document.getElementById('custName').value;
+      const roomType = document.getElementById('roomType').value;
+      const roomNo = document.getElementById('roomNumber').value;
+      const checkIn = formatDisplayDateTime(document.getElementById('checkInDateTime').value);
+      const checkOut = formatDisplayDateTime(document.getElementById('checkOutDateTime').value);
+      const days = document.getElementById('numDays').value;
+      const netTotal = document.getElementById('disp-netTotal').textContent;
+      const advance = document.getElementById('disp-advancePaid').textContent.replace('- ', '');
+      const balance = document.getElementById('disp-balanceDue').textContent;
+      const billDate = document.getElementById('disp-billDate').textContent;
+
+      // Construct formatted WhatsApp message
+      const message = 
+`🏨 *HOTEL ROJANA - TAX INVOICE*
+*Organised by Maa Tara Enterprise*
+📍 New Digha, Mini Holiday Home Sector, Purba Medinipur, W.B.
+📞 Mobile: 9046926801 | GSTIN: 19ABYFM7409E1Z0
+━━━━━━━━━━━━━━━━━━━━━
+📄 *Invoice No:* ${invoiceNo}
+📅 *Date:* ${billDate}
+👤 *Guest Name:* ${guestName}
+🛏️ *Room:* ${roomType} (Room ${roomNo})
+⏳ *Duration:* ${days} Day(s)
+📥 *Check-in:* ${checkIn}
+📤 *Check-out:* ${checkOut}
+━━━━━━━━━━━━━━━━━━━━━
+💰 *Net Total Bill:* ₹ ${netTotal}
+💳 *Advance Paid:* ₹ ${advance}
+🏷️ *Balance Due:* ${balance}
+━━━━━━━━━━━━━━━━━━━━━
+🙏 *Thank you for staying at Hotel Rojana!*
+We look forward to welcoming you again in New Digha. Have a pleasant journey ahead!`;
+
+      const encodedMessage = encodeURIComponent(message);
+      const waUrl = `https://wa.me/${fullPhoneNumber}?text=${encodedMessage}`;
+
+      // Open WhatsApp chat in a new browser tab
+      window.open(waUrl, '_blank');
+      showToast('Opening WhatsApp with invoice summary...');
+    }
+
+    /**
+     * Download Invoice as PDF using html2pdf.js with fallback
+     */
+    function downloadInvoicePDF() {
+      const invoiceElement = document.getElementById('invoice-card');
+      const invoiceNo = document.getElementById('invoiceNo').value.trim() || 'HR-Invoice';
+      const filename = `Hotel-Rojana-Invoice-${invoiceNo}.pdf`;
+
+      showToast('Generating PDF...');
+
+      if (typeof html2pdf !== 'undefined') {
+        const opt = {
+          margin: [8, 8, 8, 8],
+          filename: filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, letterRendering: true, logging: false },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(invoiceElement).save().then(() => {
+          showToast('PDF downloaded successfully!');
+        }).catch((err) => {
+          console.error('html2pdf error:', err);
+          window.print();
+        });
+      } else {
+        // Fallback to native print to PDF
+        window.print();
+      }
+    }
+
+    /**
+     * Resets form with blank or fresh invoice
+     */
+    function resetForm() {
+      if (confirm('Create a new bill? Current unsaved entries will be reset.')) {
+        document.getElementById('custName').value = '';
+        document.getElementById('custPhone').value = '';
+        document.getElementById('idNumber').value = '';
+        document.getElementById('roomNumber').value = '';
+        document.getElementById('numPersons').value = '2';
+        document.getElementById('extraCharges').value = '0';
+        document.getElementById('advancePaid').value = '0';
+        document.getElementById('billRemarks').value = '';
+        
+        generateNewSerial();
+        initializeDefaultDates();
+        handleRoomTypeChange();
+        showToast('New blank invoice ready');
+      }
+    }
+
+    /**
+     * Loads sample guest data for fast demo testing
+     */
+    function loadSampleData() {
+      document.getElementById('custName').value = 'Sourav Ganguly';
+      document.getElementById('custPhone').value = '9831098765';
+      document.getElementById('idType').value = 'Aadhaar Card';
+      document.getElementById('idNumber').value = '4521 8974 6502';
+      document.getElementById('roomType').value = 'Super Deluxe Room';
+      document.getElementById('roomRent').value = '3000';
+      document.getElementById('roomNumber').value = '302';
+      document.getElementById('numPersons').value = '4';
+      document.getElementById('extraCharges').value = '600';
+      document.getElementById('advancePaid').value = '2000';
+      document.getElementById('paymentMode').value = 'UPI / QR (GooglePay/PhonePe)';
+      document.getElementById('billRemarks').value = 'Late checkout granted till 1:00 PM. Complimentary mineral water included.';
+      
+      initializeDefaultDates();
+      updateInvoice();
+      showToast('Realistic sample guest data loaded!');
+    }
+
+    /**
+     * Mobile view switcher between Edit Form and Live Preview
+     */
+    function switchMobileView(view) {
+      const formContainer = document.getElementById('input-form-container');
+      const invoiceWrapper = document.getElementById('invoice-wrapper');
+      const formBtn = document.getElementById('tab-form-btn');
+      const prevBtn = document.getElementById('tab-preview-btn');
+
+      if (view === 'form') {
+        formContainer.classList.remove('hidden');
+        invoiceWrapper.classList.add('hidden');
+        formBtn.className = 'flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-brand-800 text-white shadow-sm transition';
+        prevBtn.className = 'flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+      } else {
+        formContainer.classList.add('hidden');
+        invoiceWrapper.classList.remove('hidden');
+        prevBtn.className = 'flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-brand-800 text-white shadow-sm transition';
+        formBtn.className = 'flex-1 py-2 text-center text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition';
+      }
+    }
+
+    /**
+     * Displays a clean transient toast notification
+     */
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.textContent = msg;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 2500);
+    }
+
+    // Auto-initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeDefaultDates();
+      updateInvoice();
+    });
+  </script>
+</body>
+</html>
